@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Trading Journal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222;
+    --surface3: #2a2a2a;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8e8e8;
+    --text2: #888;
+    --text3: #555;
+    --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.15);
+    --green-border: rgba(74,222,128,0.8);
+    --red: #f87171;
+    --red-dim: rgba(248,113,113,0.15);
+    --accent: #e8e8e8;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+    --mono: 'SF Mono', 'Fira Mono', monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+  a{color:inherit;}
+
+  /* Layout */
+  .app{max-width:1200px;margin:0 auto;padding:2rem 1.5rem;}
+  .page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;}
+  .logo{font-size:18px;font-weight:600;letter-spacing:-0.3px;}
+  .logo span{color:var(--text2);font-weight:400;}
+
+  /* Tabs */
+  .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:2rem;}
+  .tab{padding:10px 18px;font-size:14px;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:var(--font);transition:color .15s;}
+  .tab:hover{color:var(--text);}
+  .tab.on{color:var(--text);border-bottom-color:var(--green);font-weight:500;}
+
+  /* Pages */
+  .page{display:none;}.page.on{display:block;}
+
+  /* Buttons */
+  .btn-primary{background:var(--green);color:#0a1a0f;border:none;border-radius:var(--radius);padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:opacity .15s;}
+  .btn-primary:hover{opacity:.88;}
+  .btn-ghost{background:transparent;border:1px solid var(--border2);border-radius:var(--radius);padding:8px 16px;font-size:13px;cursor:pointer;font-family:var(--font);color:var(--text);transition:background .15s;}
+  .btn-ghost:hover{background:var(--surface2);}
+  .btn-danger{background:transparent;border:1px solid rgba(248,113,113,0.4);border-radius:var(--radius);padding:5px 10px;font-size:11px;cursor:pointer;font-family:var(--font);color:var(--red);transition:background .15s;}
+  .btn-danger:hover{background:var(--red-dim);}
+
+  /* Stat cards */
+  .stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1.5rem;}
+  .stat-card{background:var(--surface);padding:1.1rem 1.25rem;display:flex;justify-content:space-between;align-items:flex-start;}
+  .stat-label{font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:0.4px;}
+  .stat-val{font-size:22px;font-weight:500;color:var(--text);line-height:1;}
+  .stat-val.pos{color:var(--green);}
+  .stat-val.neg{color:var(--red);}
+  .stat-ico{font-size:14px;color:var(--text3);}
+  .stat-ico.g{color:var(--green);}
+
+  /* Row util */
+  .row-between{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;}
+  .section-title{font-size:14px;font-weight:500;color:var(--text);}
+  .divider{flex:1;height:1px;background:var(--border);margin-left:12px;}
+
+  /* Trade table */
+  .table-wrap{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;padding:10px 14px;font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);background:var(--surface);}
+  td{padding:11px 14px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr.data:hover td{background:var(--surface2);}
+  .empty{text-align:center;padding:3.5rem 0;color:var(--text3);}
+
+  /* Badges */
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+  .b-long{background:rgba(74,222,128,0.12);color:#4ade80;border:1px solid rgba(74,222,128,0.25);}
+  .b-short{background:rgba(248,113,113,0.12);color:#f87171;border:1px solid rgba(248,113,113,0.25);}
+  .b-win{background:rgba(74,222,128,0.12);color:#4ade80;}
+  .b-loss{background:rgba(248,113,113,0.12);color:#f87171;}
+
+  /* Dots */
+  .dots{display:flex;gap:5px;align-items:center;}
+  .dot{width:8px;height:8px;border-radius:50%;}
+  .dy{background:#4ade80;}.dn{background:#f87171;}
+
+  /* Modal */
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px);}
+  .modal-bg.open{display:flex;}
+  .modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:1.75rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;}
+  .modal h3{font-size:16px;font-weight:600;margin-bottom:1.5rem;color:var(--text);}
+  .fld{margin-bottom:1.1rem;}
+  .fld label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:0.4px;}
+  .fld input,.fld select,.fld textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:9px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color .15s;}
+  .fld input:focus,.fld select,.fld textarea:focus{border-color:rgba(74,222,128,0.5);}
+  .fld select{cursor:pointer;appearance:none;}
+  .fld textarea{height:80px;resize:vertical;}
+  .r2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .chklist{display:flex;flex-direction:column;gap:10px;}
+  .ci{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text);cursor:pointer;}
+  .ci input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--green);}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);}
+
+  /* Analytics */
+  .an-section{margin-bottom:1.5rem;}
+  .an-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;}
+  .an-panel-title{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1rem;font-weight:500;}
+  .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;}
+
+  /* Heatmap */
+  .hm-scroll{overflow-x:auto;padding-bottom:4px;}
+  .hm-inner{display:flex;gap:3px;}
+  .hm-yl{display:flex;flex-direction:column;gap:2px;padding-top:22px;margin-right:6px;flex-shrink:0;}
+  .hm-yl span{font-size:10px;color:var(--text3);height:12px;line-height:12px;width:22px;text-align:right;}
+  .hm-cols{display:flex;gap:3px;min-width:max-content;}
+  .hm-col{display:flex;flex-direction:column;gap:2px;}
+  .hm-col-top{height:22px;display:flex;align-items:flex-end;padding-bottom:3px;}
+  .hm-col-top span{font-size:10px;color:var(--text3);white-space:nowrap;}
+  .hm-cell{width:12px;height:12px;border-radius:2px;cursor:pointer;position:relative;transition:transform .1s;}
+  .hm-cell:hover{transform:scale(1.3);z-index:2;}
+  .hm-cell:hover::after{content:attr(data-tip);position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:#333;color:#ccc;font-size:10px;padding:4px 7px;border-radius:4px;white-space:nowrap;z-index:10;pointer-events:none;border:1px solid var(--border2);}
+  .hm-leg{display:flex;align-items:center;gap:5px;justify-content:flex-end;margin-top:8px;font-size:10px;color:var(--text3);}
+  .hm-lc{width:12px;height:12px;border-radius:2px;}
+
+  /* export */
+  .export-row{display:flex;gap:8px;}
+
+  /* toast */
+  .toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 18px;font-size:13px;color:var(--text);z-index:999;opacity:0;transform:translateY(10px);transition:all .2s;pointer-events:none;}
+  .toast.show{opacity:1;transform:translateY(0);}
+
+  @media(max-width:700px){
+    .stat-grid{grid-template-columns:1fr 1fr;}
+    .charts-row{grid-template-columns:1fr;}
+    .r2{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="page-header">
+    <div class="logo">Trading Journal <span>/ Dashboard</span></div>
+    <div class="export-row">
+      <button class="btn-ghost" onclick="exportCSV()">Export CSV</button>
+      <button class="btn-primary" onclick="openModal()">+ Log trade</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" onclick="switchTab('j')">Journal</button>
+    <button class="tab" onclick="switchTab('a')">Analytics</button>
+  </div>
+
+  <!-- JOURNAL PAGE -->
+  <div id="p-j" class="page on">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div><div class="stat-label">Total trades</div><div class="stat-val" id="s-total">0</div></div>
+        <span class="stat-ico">◈</span>
+      </div>
+      <div class="stat-card">
+        <div><div class="stat-label">Win rate</div><div class="stat-val" id="s-wr">—</div></div>
+        <span class="stat-ico" id="s-wr-ico">◎</span>
+      </div>
+      <div class="stat-card">
+        <div><div class="stat-label">Net P&amp;L</div><div class="stat-val" id="s-pnl">—</div></div>
+        <span class="stat-ico" id="s-pnl-ico">$</span>
+      </div>
+      <div class="stat-card">
+        <div><div class="stat-label">Rules score</div><div class="stat-val" id="s-rules">—</div></div>
+        <span class="stat-ico">✓</span>
+      </div>
+    </div>
+
+    <div class="row-between">
+      <span class="section-title">Trade log</span>
+      <div class="divider"></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date &amp; time</th>
+            <th>Pair</th>
+            <th>Direction</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>P&amp;L</th>
+            <th>Risk</th>
+            <th>Trend</th>
+            <th>Entry rule</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="11" class="empty">No trades yet — click "Log trade" to begin.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ANALYTICS PAGE -->
+  <div id="p-a" class="page">
+
+    <!-- Dark overview stats -->
+    <div class="stat-grid an-section">
+      <div class="stat-card">
+        <div><div class="stat-label">Win Rate</div><div class="stat-val" id="d-wr">0.0%</div></div>
+        <span class="stat-ico" id="d-wr-ico">◎</span>
+      </div>
+      <div class="stat-card">
+        <div><div class="stat-label">Total P&amp;L</div><div class="stat-val" id="d-pnl">$0.00</div></div>
+        <span class="stat-ico" id="d-pnl-ico">$</span>
+      </div>
+      <div class="stat-card">
+        <div><div class="stat-label">Profit Factor</div><div class="stat-val" id="d-pf">0</div></div>
+        <span class="stat-ico">⇅</span>
+      </div>
+      <div class="stat-card">
+        <div><div class="stat-label">Rule Compliance</div><div class="stat-val" id="d-rc">0%</div></div>
+        <span class="stat-ico">✓</span>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="an-panel an-section">
+      <div class="an-panel-title">Activity heatmap — 2026</div>
+      <div class="hm-scroll">
+        <div class="hm-inner">
+          <div class="hm-yl">
+            <span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span>
+          </div>
+          <div class="hm-cols" id="heatmap-cols"></div>
+        </div>
+      </div>
+      <div class="hm-leg">
+        <span>Less</span>
+        <div class="hm-lc" style="background:#252525"></div>
+        <div class="hm-lc" style="background:#1a4d2e"></div>
+        <div class="hm-lc" style="background:#256b3e"></div>
+        <div class="hm-lc" style="background:#2e8b47"></div>
+        <div class="hm-lc" style="background:#38c55a"></div>
+        <span>More profitable</span>
+        &nbsp;&nbsp;
+        <div class="hm-lc" style="background:#4d1a1a"></div>
+        <div class="hm-lc" style="background:#8b2e2e"></div>
+        <div class="hm-lc" style="background:#c53838"></div>
+        <span>More loss</span>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="charts-row">
+      <div class="an-panel">
+        <div class="an-panel-title">Daily P&amp;L — last 20 trades</div>
+        <canvas id="bar-chart" height="220"></canvas>
+      </div>
+      <div class="an-panel">
+        <div class="an-panel-title">Performance radar</div>
+        <canvas id="radar-chart" height="220"></canvas>
+      </div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="an-panel an-section">
+      <div class="an-panel-title">Monthly P&amp;L calendar</div>
+      <div id="cal-wrap"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h3>Log a trade</h3>
+    <div class="r2">
+      <div class="fld"><label>Pair</label><input type="text" id="f-pair" placeholder="EUR/USD"/></div>
+      <div class="fld"><label>Date &amp; time</label><input type="datetime-local" id="f-time"/></div>
+    </div>
+    <div class="r2">
+      <div class="fld"><label>Direction</label>
+        <select id="f-dir"><option>Long</option><option>Short</option></select>
+      </div>
+      <div class="fld"><label>P&amp;L ($)</label><input type="number" id="f-pnl" placeholder="e.g. 120 or -45" step="0.01"/></div>
+    </div>
+    <div class="r2">
+      <div class="fld"><label>Entry price</label><input type="number" id="f-entry" placeholder="1.08200" step="0.00001"/></div>
+      <div class="fld"><label>Exit price</label><input type="number" id="f-exit" placeholder="1.09000" step="0.00001"/></div>
+    </div>
+    <div class="fld"><label>Rule checklist</label>
+      <div class="chklist">
+        <label class="ci"><input type="checkbox" id="c-risk"/> Followed my risk management</label>
+        <label class="ci"><input type="checkbox" id="c-trend"/> Traded with the trend</label>
+        <label class="ci"><input type="checkbox" id="c-entry"/> Followed my entry rules</label>
+      </div>
+    </div>
+    <div class="fld"><label>Notes / screenshot description</label>
+      <textarea id="f-notes" placeholder="Setup description, observations, lessons..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveTrade()">Save trade</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let trades = JSON.parse(localStorage.getItem('tj_trades') || '[]');
+let barInst = null, radarInst = null;
+
+function persist() { localStorage.setItem('tj_trades', JSON.stringify(trades)); }
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach((b, i) => b.classList.toggle('on', i === (t === 'j' ? 0 : 1)));
+  document.getElementById('p-j').classList.toggle('on', t === 'j');
+  document.getElementById('p-a').classList.toggle('on', t === 'a');
+  if (t === 'a') { updateAnalytics(); }
+}
+
+function openModal() {
+  document.getElementById('modal-bg').classList.add('open');
+  const n = new Date(); n.setMinutes(n.getMinutes() - n.getTimezoneOffset());
+  document.getElementById('f-time').value = n.toISOString().slice(0, 16);
+}
+function closeModal() {
+  document.getElementById('modal-bg').classList.remove('open');
+  ['f-pair','f-pnl','f-entry','f-exit','f-notes'].forEach(id => document.getElementById(id).value = '');
+  ['c-risk','c-trend','c-entry'].forEach(id => document.getElementById(id).checked = false);
+  document.getElementById('f-dir').value = 'Long';
+}
+document.getElementById('modal-bg').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+
+function saveTrade() {
+  const pair = document.getElementById('f-pair').value.trim();
+  if (!pair) { alert('Please enter a trading pair.'); return; }
+  const t = {
+    id: Date.now(),
+    pair: pair.toUpperCase(),
+    time: document.getElementById('f-time').value,
+    dir: document.getElementById('f-dir').value,
+    pnl: parseFloat(document.getElementById('f-pnl').value) || 0,
+    entry: document.getElementById('f-entry').value,
+    exit: document.getElementById('f-exit').value,
+    risk: document.getElementById('c-risk').checked,
+    trend: document.getElementById('c-trend').checked,
+    entryRule: document.getElementById('c-entry').checked,
+    notes: document.getElementById('f-notes').value.trim()
+  };
+  trades.unshift(t);
+  persist();
+  renderTable();
+  updateJStats();
+  closeModal();
+  toast('Trade saved ✓');
+}
+
+function deleteTrade(id) {
+  if (!confirm('Delete this trade?')) return;
+  trades = trades.filter(t => t.id !== id);
+  persist();
+  renderTable();
+  updateJStats();
+  toast('Trade deleted');
+}
+
+function renderTable() {
+  const tb = document.getElementById('tbody');
+  if (!trades.length) {
+    tb.innerHTML = '<tr><td colspan="11" class="empty">No trades yet — click "Log trade" to begin.</td></tr>';
+    return;
+  }
+  tb.innerHTML = trades.map(t => {
+    const dt = t.time ? new Date(t.time) : null;
+    const ds = dt ? dt.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'2-digit'}) + ' ' + dt.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—';
+    const ps = t.pnl === 0 ? '—' : (t.pnl > 0 ? '+$' : '-$') + Math.abs(t.pnl).toFixed(2);
+    const pc = t.pnl > 0 ? 'pos' : t.pnl < 0 ? 'neg' : '';
+    const note = t.notes ? `<span title="${t.notes.replace(/"/g,"'")}" style="cursor:help;font-size:14px">📝</span>` : '<span style="color:var(--text3)">—</span>';
+    return `<tr class="data">
+      <td style="color:var(--text2);font-size:12px">${ds}</td>
+      <td style="font-weight:600">${t.pair}</td>
+      <td><span class="badge ${t.dir === 'Long' ? 'b-long' : 'b-short'}">${t.dir}</span></td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${t.entry || '—'}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${t.exit || '—'}</td>
+      <td style="font-weight:600" class="${pc}">${ps}</td>
+      <td><span class="dot ${t.risk ? 'dy' : 'dn'}" title="${t.risk ? 'Yes' : 'No'}"></span></td>
+      <td><span class="dot ${t.trend ? 'dy' : 'dn'}" title="${t.trend ? 'Yes' : 'No'}"></span></td>
+      <td><span class="dot ${t.entryRule ? 'dy' : 'dn'}" title="${t.entryRule ? 'Yes' : 'No'}"></span></td>
+      <td>${note}</td>
+      <td><button class="btn-danger" onclick="deleteTrade(${t.id})">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function calcStats() {
+  const tot = trades.length;
+  const wins = trades.filter(t => t.pnl > 0).length;
+  const net = trades.reduce((s, t) => s + t.pnl, 0);
+  const grossW = trades.filter(t => t.pnl > 0).reduce((s, t) => s + t.pnl, 0);
+  const grossL = Math.abs(trades.filter(t => t.pnl < 0).reduce((s, t) => s + t.pnl, 0));
+  const pf = grossL > 0 ? (grossW / grossL) : (grossW > 0 ? Infinity : 0);
+  const fc = trades.map(t => [t.risk, t.trend, t.entryRule].filter(Boolean).length).reduce((a, b) => a + b, 0);
+  const riskS = trades.filter(t => t.risk).length;
+  const trendS = trades.filter(t => t.trend).length;
+  const entryS = trades.filter(t => t.entryRule).length;
+  const avgW = wins > 0 ? grossW / wins : 0;
+  const losses = trades.filter(t => t.pnl < 0).length;
+  const avgL = losses > 0 ? grossL / losses : 0;
+  const rrScore = avgL > 0 ? Math.min((avgW / avgL / 3) * 100, 100) : (avgW > 0 ? 100 : 0);
+  return { tot, wins, net, grossW, grossL, pf, fc, riskS, trendS, entryS, rrScore };
+}
+
+function updateJStats() {
+  const { tot, wins, net, fc } = calcStats();
+  document.getElementById('s-total').textContent = tot;
+  const wrEl = document.getElementById('s-wr');
+  wrEl.textContent = tot ? Math.round(wins / tot * 100) + '%' : '—';
+  wrEl.className = 'stat-val' + (tot ? (wins / tot >= 0.5 ? ' pos' : ' neg') : '');
+  const pEl = document.getElementById('s-pnl');
+  pEl.textContent = tot ? (net >= 0 ? '+$' : '-$') + Math.abs(net).toFixed(2) : '—';
+  pEl.className = 'stat-val' + (net > 0 ? ' pos' : net < 0 ? ' neg' : '');
+  document.getElementById('s-pnl-ico').className = 'stat-ico' + (net >= 0 ? ' g' : '');
+  const rEl = document.getElementById('s-rules');
+  rEl.textContent = tot ? Math.round(fc / (tot * 3) * 100) + '%' : '—';
+}
+
+function updateAnalytics() {
+  const { tot, wins, net, pf, fc, riskS, trendS, entryS, rrScore } = calcStats();
+
+  const wrEl = document.getElementById('d-wr');
+  wrEl.textContent = tot ? (wins / tot * 100).toFixed(1) + '%' : '0.0%';
+  wrEl.className = 'stat-val' + (tot ? (wins / tot >= 0.5 ? ' pos' : ' neg') : '');
+
+  const pnlEl = document.getElementById('d-pnl');
+  pnlEl.textContent = (net >= 0 ? '$' : '-$') + Math.abs(net).toFixed(2);
+  pnlEl.className = 'stat-val' + (net > 0 ? ' pos' : net < 0 ? ' neg' : '');
+  document.getElementById('d-pnl-ico').className = 'stat-ico' + (net >= 0 ? ' g' : '');
+
+  const pfEl = document.getElementById('d-pf');
+  pfEl.textContent = pf === Infinity ? '∞' : pf.toFixed(2);
+  pfEl.className = 'stat-val' + (pf >= 1 ? ' pos' : pf > 0 ? ' neg' : '');
+
+  document.getElementById('d-rc').textContent = tot ? Math.round(fc / (tot * 3) * 100) + '%' : '0%';
+
+  buildHeatmap();
+  buildBarChart();
+  buildRadarChart(tot, wins, riskS, trendS, entryS, rrScore);
+  buildCalendar();
+}
+
+function buildHeatmap() {
+  const container = document.getElementById('heatmap-cols');
+  const year = new Date().getFullYear();
+  const pnlByDate = {};
+  trades.forEach(t => {
+    if (t.time) { const k = t.time.split('T')[0]; pnlByDate[k] = (pnlByDate[k] || 0) + t.pnl; }
+  });
+  const pos = Object.values(pnlByDate).filter(v => v > 0);
+  const neg = Object.values(pnlByDate).filter(v => v < 0);
+  const maxP = pos.length ? Math.max(...pos) : 1;
+  const maxN = neg.length ? Math.abs(Math.min(...neg)) : 1;
+
+  function cellColor(pnl, has) {
+    if (!has) return '#1e1e1e';
+    if (pnl > 0) { const i = Math.min(Math.ceil(pnl / maxP * 4), 4); return ['#1a4d2e','#256b3e','#2e8b47','#38c55a'][i-1]; }
+    const i = Math.min(Math.ceil(Math.abs(pnl) / maxN * 4), 4); return ['#4d1a1a','#6b2525','#8b2e2e','#c53838'][i-1];
+  }
+
+  const jan1 = new Date(year, 0, 1);
+  const gridStart = new Date(jan1);
+  gridStart.setDate(gridStart.getDate() - jan1.getDay());
+  let cur = new Date(gridStart);
+  const monthShown = {};
+  let html = '';
+
+  for (let w = 0; w < 54; w++) {
+    let days = '', mlabel = '';
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(cur);
+      const key = day.toISOString().split('T')[0];
+      const inYear = day.getFullYear() === year;
+      if (inYear && day.getDate() === 1 && !monthShown[day.getMonth()]) {
+        mlabel = day.toLocaleDateString('en-US', {month:'short'});
+        monthShown[day.getMonth()] = true;
+      }
+      const pnl = pnlByDate[key] || 0;
+      const has = !!pnlByDate[key];
+      const bg = inYear ? cellColor(pnl, has) : 'transparent';
+      const tip = inYear ? (has ? key + ': ' + (pnl >= 0 ? '+' : '') + pnl.toFixed(2) : key) : '';
+      days += `<div class="hm-cell" style="background:${bg};${!inYear?'opacity:0;':''}" data-tip="${tip}"></div>`;
+      cur.setDate(cur.getDate() + 1);
+    }
+    if (cur > new Date(year, 11, 31) && w > 50) break;
+    html += `<div class="hm-col"><div class="hm-col-top"><span>${mlabel}</span></div>${days}</div>`;
+  }
+  container.innerHTML = html;
+}
+
+function buildBarChart() {
+  const ctx = document.getElementById('bar-chart').getContext('2d');
+  if (barInst) barInst.destroy();
+  const recent = [...trades].reverse().slice(-20);
+  const labels = recent.map(t => {
+    if (!t.time) return t.pair;
+    const d = new Date(t.time);
+    return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
+  });
+  const data = recent.map(t => t.pnl);
+  const colors = data.map(v => v >= 0 ? 'rgba(74,222,128,0.75)' : 'rgba(248,113,113,0.75)');
+  barInst = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 4, borderSkipped: false }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: v => (v.raw >= 0 ? '+$' : '-$') + Math.abs(v.raw).toFixed(2) } } },
+      scales: {
+        x: { ticks: { color: '#555', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#555', font: { size: 10 }, callback: v => '$' + v }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+function buildRadarChart(tot, wins, riskS, trendS, entryS, rrScore) {
+  const ctx = document.getElementById('radar-chart').getContext('2d');
+  if (radarInst) radarInst.destroy();
+  const t = tot || 1;
+  const data = [
+    Math.round(wins / t * 100),
+    Math.round(riskS / t * 100),
+    Math.round(trendS / t * 100),
+    Math.round(entryS / t * 100),
+    Math.round(rrScore)
+  ];
+  radarInst = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: ['Win rate', 'Risk mgmt', 'Trend', 'Entry rules', 'Risk:Reward'],
+      datasets: [{
+        data,
+        backgroundColor: 'rgba(74,222,128,0.1)',
+        borderColor: 'rgba(74,222,128,0.7)',
+        borderWidth: 1.5,
+        pointBackgroundColor: 'rgba(74,222,128,0.9)',
+        pointRadius: 3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        r: {
+          min: 0, max: 100,
+          ticks: { display: false, stepSize: 25 },
+          grid: { color: 'rgba(255,255,255,0.06)' },
+          angleLines: { color: 'rgba(255,255,255,0.06)' },
+          pointLabels: { color: '#666', font: { size: 11 } }
+        }
+      }
+    }
+  });
+}
+
+function buildCalendar() {
+  const wrap = document.getElementById('cal-wrap');
+  const pnlByDate = {};
+  trades.forEach(t => {
+    if (t.time) { const k = t.time.split('T')[0]; pnlByDate[k] = (pnlByDate[k] || 0) + t.pnl; }
+  });
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const months = [];
+  for (let m = 0; m < 12; m++) {
+    const keys = Object.keys(pnlByDate).filter(k => {
+      const d = new Date(k);
+      return d.getFullYear() === year && d.getMonth() === m;
+    });
+    if (keys.length > 0) months.push(m);
+  }
+  if (!months.length) { wrap.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:1.5rem">Log trades to see your calendar.</div>'; return; }
+
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;">';
+  months.forEach(m => {
+    const firstDay = new Date(year, m, 1);
+    const daysInMonth = new Date(year, m + 1, 0).getDate();
+    const startDow = firstDay.getDay();
+    html += `<div>
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:500">${monthNames[m]} ${year}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">`;
+    dayNames.forEach(d => { html += `<div style="font-size:9px;color:var(--text3);text-align:center;padding:2px 0">${d}</div>`; });
+    for (let i = 0; i < startDow; i++) html += '<div></div>';
+    for (let day = 1; day <= daysInMonth; day++) {
+      const key = `${year}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const pnl = pnlByDate[key];
+      let bg = 'var(--surface2)', color = 'var(--text3)', fw = '400';
+      if (pnl !== undefined) {
+        bg = pnl > 0 ? 'rgba(74,222,128,0.18)' : 'rgba(248,113,113,0.18)';
+        color = pnl > 0 ? '#4ade80' : '#f87171';
+        fw = '600';
+      }
+      const tip = pnl !== undefined ? `title="${key}: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}"` : '';
+      html += `<div ${tip} style="background:${bg};border-radius:4px;text-align:center;padding:4px 2px;font-size:10px;color:${color};font-weight:${fw};cursor:${pnl!==undefined?'help':'default'}">${day}</div>`;
+    }
+    html += '</div></div>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+function exportCSV() {
+  if (!trades.length) { toast('No trades to export'); return; }
+  const headers = ['Date','Pair','Direction','Entry','Exit','PnL','Risk Mgmt','Trend','Entry Rules','Notes'];
+  const rows = trades.map(t => [
+    t.time, t.pair, t.dir, t.entry, t.exit, t.pnl,
+    t.risk?'Yes':'No', t.trend?'Yes':'No', t.entryRule?'Yes':'No',
+    '"' + (t.notes||'').replace(/"/g,"'") + '"'
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'trading-journal.csv';
+  a.click();
+  toast('CSV exported ✓');
+}
+
+// Init
+renderTable();
+updateJStats();
+</script>
+</body>
+</html>
